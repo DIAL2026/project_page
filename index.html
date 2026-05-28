@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIAL: Decoupling Intent and Action via Latent World Modeling for End-to-End VLA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Carlito',Calibri,sans-serif;color:#e6edf3;font-size:16px;line-height:1.65;background:#0d1117;overflow-x:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+a{color:#58a6ff;text-decoration:none}
+
+body::after{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;opacity:.04;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-repeat:repeat;background-size:180px 180px}
+
+@keyframes fadeInUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.reveal{opacity:0;transform:translateY(18px)}
+.reveal.visible{animation:fadeInUp .65s cubic-bezier(.25,.46,.45,.94) forwards}
+
+@keyframes heroUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+.hero-anim{opacity:0;animation:heroUp .6s ease forwards}
+.hero-anim.d1{animation-delay:.08s}
+.hero-anim.d2{animation-delay:.16s}
+.hero-anim.d3{animation-delay:.24s}
+.hero-anim.d4{animation-delay:.32s}
+
+nav.topnav{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(13,17,23,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.06);padding:.5rem 0;transition:background .3s,box-shadow .3s}
+nav.topnav.scrolled{background:rgba(13,17,23,.95);box-shadow:0 1px 3px rgba(0,0,0,.2),0 4px 16px rgba(0,0,0,.15)}
+.nav-inner{max-width:1100px;margin:0 auto;padding:0 2rem;display:flex;align-items:center;gap:2rem;font-size:.82rem}
+.nav-logo{font-family:'DM Mono',monospace;font-weight:500;font-size:.85rem;color:#58a6ff;text-decoration:none;letter-spacing:.12em;text-transform:uppercase}
+
+.side-nav{position:fixed;top:50%;left:1.2rem;transform:translateY(-50%);z-index:199;display:flex;flex-direction:column;gap:.6rem}
+.side-nav a{display:block;padding:.45rem .85rem;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:rgba(230,237,243,.3);text-decoration:none;border-left:2px solid transparent;transition:all .25s;font-family:'Carlito',Calibri,sans-serif;white-space:nowrap}
+.side-nav a:hover{color:rgba(230,237,243,.65)}
+.side-nav a.active{color:#e6edf3;border-left-color:#58a6ff}
+.side-nav{transition:opacity .4s ease}
+.side-nav.hidden{opacity:0;pointer-events:none}
+
+@keyframes heroShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+@keyframes orbFloat1{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-20px)}}
+@keyframes orbFloat2{0%,100%{transform:translate(0,0)}50%{transform:translate(-25px,15px)}}
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:100px 2rem 4rem;background:linear-gradient(135deg,#0d1117,#101824,#13101f,#0e151d,#0d1117);background-size:300% 300%;animation:heroShift 16s ease infinite;color:#e6edf3;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;width:500px;height:500px;top:-10%;left:-8%;border-radius:50%;background:radial-gradient(circle,rgba(67,97,238,.15),transparent 70%);pointer-events:none;animation:orbFloat1 12s ease-in-out infinite;filter:blur(40px)}
+.hero::after{content:'';position:absolute;width:450px;height:450px;bottom:-5%;right:-6%;border-radius:50%;background:radial-gradient(circle,rgba(114,9,183,.12),transparent 70%);pointer-events:none;animation:orbFloat2 14s ease-in-out infinite;filter:blur(40px)}
+.hero-dots{position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(67,97,238,.08) 1px,transparent 1px);background-size:28px 28px;z-index:0}
+.hero>*{position:relative;z-index:1}
+.hero h1{font-family:'Plus Jakarta Sans','Carlito',sans-serif;font-size:clamp(2.4rem,5.8vw,4.2rem);line-height:1.12;letter-spacing:-.02em;max-width:1060px;margin-bottom:16px;font-weight:800;color:#e6edf3}
+.hero h1 em{font-style:normal;background:linear-gradient(135deg,#58a6ff,#bc8cff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-shadow:none}
+.hero .subtitle{color:rgba(230,237,243,.55);font-size:1.05rem;margin:0 auto 1.5rem;max-width:780px;line-height:1.7}
+.hero .conf-badge{display:inline-block;margin-bottom:1.2rem;padding:.4rem 1.2rem;border-radius:20px;background:rgba(67,97,238,.15);border:1px solid rgba(67,97,238,.3);color:#58a6ff;font-size:.82rem;font-weight:700;letter-spacing:.04em}
+
+.hero-teaser{max-width:1280px;width:100%;margin-top:2.5rem}
+.hero-teaser video{width:100%;border-radius:14px;box-shadow:0 4px 12px rgba(0,0,0,.3),0 20px 60px rgba(0,0,0,.4);display:block}
+
+.hero-demos{max-width:1280px;width:100%;margin-top:3.5rem}
+.demo-heading{font-size:1.05rem;font-weight:700;color:rgba(230,237,243,.75);letter-spacing:.04em;text-transform:uppercase;margin-bottom:1.4rem;font-family:'Carlito',Calibri,sans-serif;position:relative;padding-bottom:.55rem;display:inline-block}
+.demo-heading::after{content:'';position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:36px;height:2px;background:linear-gradient(90deg,#58a6ff,#bc8cff);border-radius:2px;box-shadow:0 0 8px rgba(88,166,255,.3)}
+.demo-filters{display:flex;flex-direction:column;gap:.55rem;align-items:center;margin-bottom:1.4rem}
+.demo-filters .demo-tabs{margin-bottom:0}
+.demo-tabs{display:flex;gap:.5rem;margin-bottom:1rem;justify-content:center;flex-wrap:wrap}
+.demo-tabs button{padding:.4rem 1.4rem;border:1px solid rgba(255,255,255,.18);border-radius:20px;background:rgba(255,255,255,.05);color:rgba(230,237,243,.55);font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:'Carlito',Calibri,sans-serif;backdrop-filter:blur(6px)}
+.demo-tabs button.active{background:#4361ee;color:#fff;border-color:#4361ee;box-shadow:0 2px 10px rgba(67,97,238,.35),0 0 0 3px rgba(67,97,238,.12)}
+.demo-tabs button:hover:not(.active){background:rgba(88,166,255,.1);color:#58a6ff;border-color:rgba(88,166,255,.3)}
+.demo-tabs.secondary button{padding:.32rem 1rem;font-size:.74rem;border-radius:16px}
+.demo-tabs.secondary button.active{background:rgba(88,166,255,.18);color:#fff;border-color:rgba(88,166,255,.55);box-shadow:0 1px 6px rgba(88,166,255,.2),0 0 0 2px rgba(88,166,255,.08)}
+.demo-carousel{position:relative}
+.demo-carousel .carousel-track{display:grid;grid-template-columns:repeat(3,1fr);gap:1.0rem}
+
+.section{padding:4.5rem 2rem;position:relative}
+.section.alt{background:#161b22}
+.section.alt::before{content:'';position:absolute;top:0;left:0;right:0;height:48px;background:linear-gradient(to bottom,#0d1117,#161b22);pointer-events:none}
+.section.alt::after{content:'';position:absolute;bottom:0;left:0;right:0;height:48px;background:linear-gradient(to top,#0d1117,#161b22);pointer-events:none}
+.section-inner{max-width:1000px;margin:0 auto}
+.section-title{font-family:'Carlito',Calibri,sans-serif;font-size:1.6rem;font-weight:700;margin-bottom:1.4rem;position:relative;padding-bottom:.55rem;color:#e6edf3}
+.section-title::after{content:'';position:absolute;left:0;bottom:0;width:52px;height:3px;background:linear-gradient(90deg,#58a6ff,#bc8cff);border-radius:3px;box-shadow:0 0 8px rgba(88,166,255,.25)}
+.section-subtitle{font-size:1.1rem;font-weight:700;margin-top:2.2rem;margin-bottom:.6rem;color:#e6edf3}
+
+.blog-text{font-size:1.05rem;color:#c9d1d9;line-height:1.8}
+.blog-text p+p{margin-top:1rem}
+.blog-text strong{color:#e6edf3}
+
+.callout{font-size:1rem;color:#c9d1d9;padding-left:1.25rem;margin:1.5rem 0;position:relative;line-height:1.75}
+.callout::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(to bottom,#58a6ff,#bc8cff);border-radius:2px}
+
+.section-divider{margin:2.8rem 0;height:1px;background:linear-gradient(90deg,transparent,#30363d,transparent)}
+
+.method-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.25rem;margin:1.5rem 0}
+.method-card{background:#161b22;border:1px solid #30363d;border-radius:16px;padding:1.6rem;transition:box-shadow .3s,transform .3s;box-shadow:0 1px 2px rgba(0,0,0,.15),0 4px 16px rgba(0,0,0,.1)}
+.method-card:hover{box-shadow:0 2px 4px rgba(0,0,0,.2),0 12px 40px rgba(0,0,0,.25);transform:translateY(-3px)}
+.method-card .card-label{display:inline-block;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:.2rem .65rem;border-radius:6px;margin-bottom:.7rem}
+.method-card .card-label.sys2{background:rgba(88,166,255,.12);color:#58a6ff}
+.method-card .card-label.sys1{background:rgba(63,185,80,.12);color:#3fb950}
+.method-card .card-label.train{background:rgba(139,148,158,.12);color:#8b949e}
+.method-card h4{font-size:1.04rem;font-weight:700;margin-bottom:.45rem;color:#e6edf3}
+.method-card p{font-size:.9rem;color:#8b949e;line-height:1.6}
+
+figure.fig{margin:2.2rem 0;text-align:center}
+figure.fig img{max-width:100%;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.2),0 8px 32px rgba(0,0,0,.3);transition:transform .3s;filter:invert(1) hue-rotate(180deg)}
+figure.fig.no-invert img{filter:none}
+figure.fig:hover img{transform:scale(1.005)}
+figure.fig.fig-narrow img{max-width:85%;margin:0 auto}
+figure.fig figcaption{font-size:.85rem;color:#8b949e;margin-top:.8rem;line-height:1.5;max-width:85%;margin-left:auto;margin-right:auto}
+
+.tabs{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.tabs button{padding:.4rem 1.15rem;border:1px solid #30363d;border-radius:20px;background:#161b22;color:#8b949e;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:'Carlito',Calibri,sans-serif}
+.tabs button.active{background:#4361ee;color:#fff;border-color:#4361ee;box-shadow:0 2px 10px rgba(67,97,238,.35),0 0 0 3px rgba(67,97,238,.12)}
+.tabs button:hover:not(.active){background:rgba(88,166,255,.08);color:#58a6ff;border-color:rgba(88,166,255,.3)}
+
+.carousel{position:relative}
+.carousel-track{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;overflow:hidden}
+.carousel-btn{position:absolute;top:50%;transform:translateY(-50%);z-index:5;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.12);background:rgba(22,27,34,.92);backdrop-filter:blur(8px);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,.25);color:#e6edf3}
+.carousel-btn:hover{background:rgba(22,27,34,1);box-shadow:0 4px 14px rgba(0,0,0,.3),0 0 0 3px rgba(88,166,255,.1);border-color:rgba(255,255,255,.2)}
+.carousel-btn.prev{left:-18px}
+.carousel-btn.next{right:-18px}
+.carousel-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.carousel-counter{display:none}
+
+.video-card{border:1px solid #30363d;border-radius:14px;overflow:hidden;background:#161b22;transition:box-shadow .3s,transform .3s;box-shadow:0 1px 2px rgba(0,0,0,.15),0 3px 12px rgba(0,0,0,.1)}
+.video-card:hover{box-shadow:0 2px 4px rgba(0,0,0,.2),0 10px 32px rgba(0,0,0,.3);transform:translateY(-2px)}
+.video-card .vc-label{padding:.55rem .85rem .35rem;font-size:.78rem;color:#c9d1d9;font-style:italic;line-height:1.4;min-height:2.6rem;display:flex;align-items:center}
+.video-card .vc-video-wrap{position:relative}
+.video-card .vc-video-wrap video{width:100%;display:block}
+.speed-badge{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.65);color:#fff;font-size:.58rem;font-weight:700;padding:2px 8px;border-radius:8px;pointer-events:none;backdrop-filter:blur(4px);letter-spacing:.02em}
+
+.rw-video-wrap{position:relative;overflow:hidden;border-radius:10px;background:#000;aspect-ratio:10/9}
+.rw-video-wrap video{width:100%;height:100%;object-fit:fill;display:block}
+#demo-carousel-multistage-id .rw-video-wrap,
+#demo-carousel-multistage-ood .rw-video-wrap,
+#carousel-rw-multistage-id .rw-video-wrap,
+#carousel-rw-multistage-ood .rw-video-wrap{aspect-ratio:9/10}
+.category-tag{position:absolute;top:6px;left:6px;color:#fff;font-size:.62rem;font-weight:700;padding:2px 8px;border-radius:8px;z-index:2;pointer-events:none;backdrop-filter:blur(4px)}
+.rw-video-wrap .speed-badge{z-index:2}
+
+footer{text-align:center;padding:2.5rem 2rem;color:#484f58;font-size:.82rem;border-top:none;position:relative}
+footer::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,#30363d,transparent)}
+
+@media(max-width:700px){
+  .hero{padding:80px 1.2rem 2.5rem}
+  .hero h1{font-size:1.8rem}
+  .hero-teaser{margin-top:1.5rem}
+  .section{padding:3rem 1.2rem}
+  .method-cards{grid-template-columns:1fr}
+  .carousel-track{grid-template-columns:1fr}
+  .carousel-btn{display:none}
+  .nav-inner{padding:0 1rem;gap:1rem}
+  .side-nav{display:none}
+  figure.fig.fig-narrow img{max-width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════ TOP BAR ════════════════ -->
+<nav class="topnav" id="topnav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">DIAL</a>
+  </div>
+</nav>
+
+<!-- ════════════════ LEFT SIDE NAV ════════════════ -->
+<div class="side-nav" id="side-nav">
+  <a href="#intro" data-section="intro">Intro</a>
+  <a href="#why-hard" data-section="why-hard">Background</a>
+  <a href="#how-it-works" data-section="how-it-works">Method</a>
+  <a href="#sim-results" data-section="sim-results">Simulation</a>
+  <a href="#real-world" data-section="real-world">Real World</a>
+  <a href="#what-learns" data-section="what-learns">Insights</a>
+</div>
+
+<!-- ════════════════ HERO ════════════════ -->
+<section class="hero" id="hero">
+  <div class="hero-dots"></div>
+  <span class="conf-badge hero-anim d1">CoRL 2026 Submission</span>
+  <h1 class="hero-anim d2"><em>DIAL:</em> <em>D</em>ecoupling <em>I</em>ntent and <em>A</em>ction via <em>L</em>atent World Modeling for End-to-End VLA</h1>
+  <p class="subtitle hero-anim d3">An end-to-end Vision-Language-Action framework that bridges high-level VLM reasoning and low-level motor execution through a differentiable latent intent bottleneck, achieving state-of-the-art performance with 10&times; fewer demonstrations and robust zero-shot generalization on real-world humanoid robots.</p>
+  <div class="hero-teaser hero-anim d3">
+    <video id="teaser-video" src="videos/teaser_live_dark_with_long_horizon_last5s_faststart.mp4" poster="figures/teaser_with_long_horizon_poster.jpg" autoplay muted playsinline controls></video>
+  </div>
+
+  <!-- ── Demo Videos ── -->
+  <div class="hero-demos hero-anim d4">
+    <p class="demo-heading">Real-World Deployment Demos</p>
+    <div class="demo-filters">
+      <div class="demo-tabs" id="demo-tabs-task">
+        <button data-task="basic">Basic Manipulation</button>
+        <button class="active" data-task="multistage">Multi-Stage Manipulation</button>
+      </div>
+      <div class="demo-tabs secondary" id="demo-tabs-dist">
+        <button class="active" data-dist="id">In-Distribution</button>
+        <button data-dist="ood">Out-of-Distribution</button>
+      </div>
+    </div>
+    <div class="demo-carousel" id="demo-carousel-basic-id" style="display:none">
+      <button class="carousel-btn prev" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <div class="carousel-track" id="demo-basic-id-row"></div>
+      <button class="carousel-btn next" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
+    </div>
+    <div class="demo-carousel" id="demo-carousel-basic-ood" style="display:none">
+      <button class="carousel-btn prev" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <div class="carousel-track" id="demo-basic-ood-row"></div>
+      <button class="carousel-btn next" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
+    </div>
+    <div class="demo-carousel" id="demo-carousel-multistage-id">
+      <button class="carousel-btn prev" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <div class="carousel-track" id="demo-multistage-id-row"></div>
+      <button class="carousel-btn next" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
+    </div>
+    <div class="demo-carousel" id="demo-carousel-multistage-ood" style="display:none">
+      <button class="carousel-btn prev" data-dir="-1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <div class="carousel-track" id="demo-multistage-ood-row"></div>
+      <button class="carousel-btn next" data-dir="1"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ INTRODUCTION ════════════════ -->
+<section class="section alt" id="intro">
+  <div class="section-inner reveal">
+    <div class="blog-text">
+      <p>Pre-trained <strong>Vision-Language Models (VLMs)</strong> have accelerated the development of Vision-Language-Action (VLA) models, yet most end-to-end VLAs treat the VLM as a passive multimodal encoder, mapping features directly to actions. This underutilizes the VLM&rsquo;s decision-making potential and risks degrading its semantic representations during training.</p>
+
+      <p>We introduce <strong>DIAL</strong> (<strong>D</strong>ecoupling <strong>I</strong>ntent and <strong>A</strong>ction via <strong>L</strong>atent World Modeling), which bridges high-level reasoning and low-level execution through a <strong>differentiable latent intent bottleneck</strong>. Rather than directly producing actions, a VLM-based System-2 predicts a future visual subgoal within its native ViT feature space, where alignment with pretrained semantics lets the foresight naturally encode the VLM&rsquo;s latent intent. This intent serves as the sole interface to a lightweight System-1, which decodes it into precise actions via latent inverse dynamics, strictly anchoring execution to the VLM&rsquo;s high-level reasoning.</p>
+
+      <p>A two-stage paradigm first warms up both systems independently in a shared latent space, then seamlessly transitions to end-to-end optimization that refines the VLM with action-aware gradients while preserving pretrained knowledge. On the RoboCasa GR1 Tabletop benchmark, DIAL establishes a new state of the art with <strong>10&times; fewer demonstrations</strong> than prior methods. By further leveraging heterogeneous human data, DIAL acquires grounded manipulation priors and demonstrates robust <strong>zero-shot generalization</strong> to unseen objects and novel configurations in real-world humanoid deployments.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ WHY IS THIS HARD? ════════════════ -->
+<section class="section" id="why-hard">
+  <div class="section-inner reveal">
+    <h2 class="section-title">Why is this hard?</h2>
+    <div class="blog-text">
+      <p>Translating a VLM&rsquo;s high-level understanding into precise motor control remains one of the central challenges in embodied AI. Existing approaches fall into two paradigms, each with a fundamental limitation.</p>
+
+      <p><strong>Hierarchical planners</strong> prompt VLMs to generate text or code plans for a separate low-level controller. While modular, this incurs inter-system latency and introduces a non-differentiable interface that blocks action gradients from refining the VLM&rsquo;s physical understanding.</p>
+
+      <p><strong>End-to-end VLAs</strong> directly predict actions from the VLM&rsquo;s representations. This is fully differentiable, but often reduces the VLM to a passive encoder. Even methods that add auxiliary foresight objectives suffer from a critical weakness&mdash;without a strict structural bottleneck, the policy can learn shortcuts that bypass true intent grounding.</p>
+    </div>
+
+    <figure class="fig reveal">
+      <img src="figures/related_work.png" alt="Comparison of VLA architectures">
+      <figcaption>Existing VLA paradigms and their limitations. Hierarchical planners (left) suffer from non-differentiable gaps. End-to-end VLAs (middle) treat foresight as optional context. DIAL (right) enforces a structural bottleneck through latent intent prediction.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ════════════════ HOW DOES IT WORK? ════════════════ -->
+<section class="section alt" id="how-it-works">
+  <div class="section-inner reveal">
+    <h2 class="section-title">Method Overview</h2>
+    <div class="blog-text">
+      <p>DIAL implements a <strong>dual-system architecture</strong>. <strong>System-2</strong> (the &ldquo;Brain&rdquo;) is the VLM performing latent world modeling; <strong>System-1</strong> (the &ldquo;Cerebellum&rdquo;) is a lightweight inverse dynamics policy that turns the predicted intent into motor commands.</p>
+    </div>
+
+    <figure class="fig no-invert reveal">
+      <video id="model-overview-video" src="videos/model_overview_dark.mp4" autoplay muted playsinline controls style="width:80%;margin:0 auto;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.2),0 8px 32px rgba(0,0,0,.3);display:block;transform:scaleY(0.95)"></video>
+      <figcaption>Dual-system architecture of DIAL. System-2 synthesizes latent foresight from language and visual input. System-1 fuses current observation with predicted intent for action generation via flow matching. Training switches from decoupled warmup to end-to-end optimization.</figcaption>
+    </figure>
+
+    <div class="method-cards">
+      <div class="method-card reveal">
+        <span class="card-label sys2">System-2</span>
+        <h4>Latent World Modeling</h4>
+        <p>Learnable query tokens are appended to the VLM&rsquo;s LLM sequence. Their output representations are projected through an MLP head to synthesize the latent intent, trained via MSE alignment with ground-truth ViT features of the future observation.</p>
+      </div>
+      <div class="method-card reveal">
+        <span class="card-label sys1">System-1</span>
+        <h4>Latent Inverse Dynamics</h4>
+        <p>A self-attention module fuses current ViT features with the predicted latent intent. A DiT-based decoder then generates action chunks via flow matching, conditioned on this fused signal and the robot&rsquo;s proprioceptive state.</p>
+      </div>
+      <div class="method-card reveal">
+        <span class="card-label train">Training</span>
+        <h4>Decoupled Warmup &rarr; End-to-End</h4>
+        <p><strong>Stage 1:</strong> System-2 learns foresight via the world modeling loss; System-1 learns control conditioned on ground-truth future features. <strong>Stage 2:</strong> System-1 switches to System-2&rsquo;s predicted intent, enabling action-aware gradients to flow back into the VLM.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ SIMULATION BENCHMARK ════════════════ -->
+<section class="section" id="sim-results">
+  <div class="section-inner">
+    <h2 class="section-title reveal">Simulation Benchmark Results</h2>
+    <div class="blog-text reveal">
+      <p>We evaluate DIAL on the <strong>RoboCasa GR1 Tabletop</strong> benchmark (24 tasks: 18 Pick &amp; Place + 6 Articulated). With full training data, DIAL achieves <strong>70.2%</strong> average success rate, outperforming the strongest prior method by nearly 15 percentage points. In the few-shot setting (100 trajectories per task, 10% of full data), DIAL reaches <strong>58.3%</strong>, already exceeding the best full-data baseline.</p>
+    </div>
+
+    <figure class="fig reveal">
+      <img src="figures/results_robocasa_full.png" alt="Full-data benchmark results">
+      <figcaption>Full-data results on RoboCasa GR1 Tabletop (24 tasks, 1000 trajectories per task).</figcaption>
+    </figure>
+
+    <div class="blog-text reveal">
+      <p>Example rollouts from the simulation benchmark:</p>
+    </div>
+
+    <div class="reveal">
+      <div class="tabs" id="sim-tabs">
+        <button class="active" data-tab="pp">Pick &amp; Place</button>
+        <button data-tab="art">Articulated Tasks</button>
+      </div>
+      <div class="carousel" id="carousel-sim-pp">
+        <button class="carousel-btn prev" data-dir="-1"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="carousel-track" id="sim-video-pp"></div>
+        <button class="carousel-btn next" data-dir="1"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></button>
+        <div class="carousel-counter"></div>
+      </div>
+      <div class="carousel" id="carousel-sim-art" style="display:none">
+        <button class="carousel-btn prev" data-dir="-1"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="carousel-track" id="sim-video-art"></div>
+        <button class="carousel-btn next" data-dir="1"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></button>
+        <div class="carousel-counter"></div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <figure class="fig reveal">
+      <img src="figures/results_robocasa.png" alt="Few-shot results and ablation study">
+      <figcaption>Few-shot performance (100 trajectories per task). DIAL with 10% data outperforms all baselines trained with full data.</figcaption>
+    </figure>
+
+    <figure class="fig reveal">
+      <img src="figures/results_robocasa_egodex_narrow.png" alt="Impact of human demonstrations">
+      <figcaption>Impact of cross-embodiment human demonstrations on both in-distribution and OOD generalization.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ════════════════ REAL-WORLD GENERALIZATION ════════════════ -->
+<section class="section alt" id="real-world">
+  <div class="section-inner">
+    <h2 class="section-title reveal">Real-World Deployment</h2>
+    <div class="blog-text reveal">
+      <p>We validate DIAL on a humanoid robot across <strong>four real-world tasks</strong> in two regimes:</p>
+      <ul style="margin:.6rem 0 .9rem 1.4rem;line-height:1.8">
+        <li><strong>Cross-embodiment learning:</strong> <strong>Pick &amp; Place</strong> and <strong>Pouring</strong>, jointly trained on heterogeneous human and robot demonstrations.</li>
+        <li><strong>Multi-stage coordination:</strong> <strong>Bimanual Handover &amp; Shelving</strong> and <strong>Trash Collection &amp; Emptying</strong>, requiring sequencing several sub-stages with tool use and inter-hand coordination.</li>
+      </ul>
+      <p>DIAL achieves <strong>77.5%</strong> in-distribution success and <strong>58.3%</strong> out-of-distribution success on cross-embodiment tasks, and demonstrates robust multi-stage coordination with zero-shot transfer to unseen fixtures and surfaces.</p>
+    </div>
+
+    <figure class="fig no-invert reveal">
+      <img src="figures/demo_task_with_long_horizon_dark.png" alt="Real-world task design">
+      <figcaption>Real-world tasks and data sources. <strong>(Top)</strong> Cross-embodiment learning with human and robot demonstrations. <strong>(Bottom)</strong> Multi-stage coordination trained on robot-native sequences.</figcaption>
+    </figure>
+
+    <!-- In-Distribution -->
+    <h3 class="section-subtitle reveal">In-Distribution Performance</h3>
+    <figure class="fig reveal">
+      <img src="figures/results_real_robot_id.png" alt="In-distribution results">
+      <figcaption>In-distribution success rates on cross-embodiment tasks.</figcaption>
+    </figure>
+    <div class="reveal">
+      <div class="carousel" id="carousel-rw-id">
+        <button class="carousel-btn prev" data-dir="-1"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="carousel-track" id="rw-id-row"></div>
+        <button class="carousel-btn next" data-dir="1"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></button>
+        <div class="carousel-counter"></div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- Out-of-Distribution -->
+    <h3 class="section-subtitle reveal">Out-of-Distribution Generalization</h3>
+    <div class="blog-text reveal">
+      <p>We evaluate three types of zero-shot generalization: <strong>combinatorial</strong> (multiple objects requiring disambiguation), <strong>distractor robustness</strong> (unseen background clutter), and <strong>instance-level transfer</strong> (novel object geometries). DIAL handles all three without task-specific adaptation.</p>
+    </div>
+    <figure class="fig reveal">
+      <img src="figures/results_real_robot_ood.png" alt="OOD results">
+      <figcaption>Out-of-distribution results across three generalization challenges.</figcaption>
+    </figure>
+    <div class="reveal">
+      <div class="carousel" id="carousel-rw-ood">
+        <button class="carousel-btn prev" data-dir="-1"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="carousel-track" id="rw-ood-row"></div>
+        <button class="carousel-btn next" data-dir="1"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></button>
+        <div class="carousel-counter"></div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- Multi-Stage Coordination -->
+    <h3 class="section-subtitle reveal">Multi-Stage Coordination</h3>
+    <div class="blog-text reveal">
+      <p><strong>Bimanual Handover &amp; Shelving</strong> (pick &rarr; transfer &rarr; place) and <strong>Trash Collection &amp; Emptying</strong> (grasp dustpan &rarr; grasp broom &rarr; sweep &rarr; empty) require coherent phase transitions across sub-stages. DIAL&rsquo;s latent intent provides reliable guidance across these phases, enabling zero-shot transfer to unseen shelves and tablecloths.</p>
+    </div>
+
+    <figure class="fig reveal">
+      <img src="figures/results_multistage.png" alt="Multi-stage results">
+      <figcaption>Multi-stage task results. Solid bars: success rate (all sub-stages completed); translucent bars: task progress (average sub-stage completion).</figcaption>
+    </figure>
+
+    <div class="reveal">
+      <div class="tabs" id="rw-multistage-tabs">
+        <button class="active" data-tab="id">In-Distribution</button>
+        <button data-tab="ood">Out-of-Distribution</button>
+      </div>
+      <div class="carousel" id="carousel-rw-multistage-id">
+        <button class="carousel-btn prev" data-dir="-1"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="carousel-track" id="rw-multistage-id-row"></div>
+        <button class="carousel-btn next" data-dir="1"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></button>
+        <div class="carousel-counter"></div>
+      </div>
+      <div class="carousel" id="carousel-rw-multistage-ood" style="display:none">
+        <button class="carousel-btn prev" data-dir="-1"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="carousel-track" id="rw-multistage-ood-row"></div>
+        <button class="carousel-btn next" data-dir="1"><svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg></button>
+        <div class="carousel-counter"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ WHAT DOES DIAL LEARN? ════════════════ -->
+<section class="section" id="what-learns">
+  <div class="section-inner reveal">
+    <h2 class="section-title">What Does DIAL Learn?</h2>
+    <div class="blog-text">
+      <p>We visualize DIAL&rsquo;s predicted foresight by projecting latent features onto their top-3 PCA components (mapped to RGB). The predicted foresight closely matches the ground-truth future in task-relevant regions, confirming that System-2 anticipates meaningful state transitions rather than copying the present scene, providing System-1 with a spatially aligned semantic roadmap.</p>
+    </div>
+
+    <figure class="fig fig-narrow no-invert reveal">
+      <img src="figures/latent_visualization_dark.png" alt="Latent foresight visualization">
+      <figcaption>PCA visualization of latent features. Predicted foresight aligns with the ground-truth future in task-relevant regions. The cosine distance heatmap (right) reveals where the model anticipates the greatest change.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ════════════════ FOOTER ════════════════ -->
+<footer>
+  <p>Anonymous submission to CoRL 2026. This page is provided as supplementary material for review purposes.</p>
+</footer>
+
+<!-- ════════════════ SCRIPT ════════════════ -->
+<script>
+(function(){
+  var topnav = document.getElementById('topnav');
+  var sideNav = document.querySelector('.side-nav');
+  var heroEl = document.querySelector('.hero');
+  if(sideNav) sideNav.classList.add('hidden');
+  window.addEventListener('scroll', function(){
+    topnav.classList.toggle('scrolled', window.scrollY > 80);
+    if(sideNav && heroEl){
+      sideNav.classList.toggle('hidden', window.scrollY < heroEl.offsetHeight - 100);
+    }
+  }, {passive:true});
+
+  var sections = document.querySelectorAll('section[id]');
+  var sideLinks = document.querySelectorAll('.side-nav a[data-section]');
+  var navObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        sideLinks.forEach(function(a){ a.classList.toggle('active', a.getAttribute('data-section') === e.target.id); });
+      }
+    });
+  }, {rootMargin:'-30% 0px -60% 0px'});
+  sections.forEach(function(s){ navObs.observe(s); });
+
+  var revealObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('visible'); revealObs.unobserve(e.target); } });
+  }, {threshold:0.08});
+  document.querySelectorAll('.reveal').forEach(function(el){ revealObs.observe(el); });
+
+  function makeSimCard(filename){
+    var raw = filename.replace(/\.mp4$/, '');
+    var instruction = raw.charAt(0).toUpperCase() + raw.slice(1) + '.';
+    var card = document.createElement('div');
+    card.className = 'video-card';
+    card.innerHTML =
+      '<div class="vc-label">' + instruction + '</div>' +
+      '<div class="vc-video-wrap">' +
+        '<video data-src="videos/robocasa/' + encodeURI(filename) + '" muted loop playsinline preload="none"></video>' +
+        '<span class="speed-badge">Autonomous &times;2</span>' +
+      '</div>';
+    return card;
+  }
+
+  var tagColors = {
+    'Pick & Place': 'rgba(67,97,238,.55)',
+    'Pouring': 'rgba(219,39,119,.55)',
+    'Combinatorial Generalization': 'rgba(239,68,68,.55)',
+    'Distractor Robustness': 'rgba(249,115,22,.55)',
+    'Instance-Level Transfer': 'rgba(20,184,166,.55)',
+    'Surface-Level Transfer': 'rgba(234,179,8,.55)',
+    'Fixture-Level Transfer': 'rgba(114,9,183,.55)',
+    'Sweeping': 'rgba(71,85,105,.55)',
+    'Handover': 'rgba(34,197,94,.55)',
+  };
+
+  function makeRealCard(key, instruction, tag){
+    var bg = tagColors[tag] || 'rgba(0,0,0,.5)';
+    var card = document.createElement('div');
+    card.className = 'video-card';
+    card.innerHTML =
+      '<div class="vc-label">' + instruction + '</div>' +
+      '<div class="rw-video-wrap">' +
+        '<span class="category-tag" style="background:' + bg + '">' + tag + '</span>' +
+        '<video data-src="videos/real_world_processed/' + key + '.mp4" muted loop playsinline preload="none"></video>' +
+        '<span class="speed-badge">Autonomous &times;2</span>' +
+      '</div>';
+    return card;
+  }
+
+  function fill(id, cards){
+    var c = document.getElementById(id);
+    cards.forEach(function(card){ c.appendChild(card); });
+  }
+
+  var ppVideos = [
+    'pick the croissant from the tray and place it in the tiered basket.mp4',
+    'pick the cupcake from the plate and place it in the cardboard box.mp4',
+    'pick the eggplant from the cutting board and place it in the pan.mp4',
+    'pick the lemon from the plate and place it in the cardboard box.mp4',
+    'pick the squash from the cutting board and place it in the pan.mp4',
+    'pick the sweet potato from the tray and place it in the tiered basket.mp4'
+  ];
+  var artVideos = [
+    'pick up the bottled water, place it into the cabinet and close the cabinet.mp4',
+    'pick up the can, place it into the drawer and close the drawer.mp4',
+    'pick up the cup, place it into the drawer and close the drawer.mp4',
+    'pick up the milk, place it into the microwave and close the microwave.mp4',
+    'pick up the potato, place it into the microwave and close the microwave.mp4',
+    'pick up the wine, place it into the cabinet and close the cabinet.mp4'
+  ];
+  ppVideos.forEach(function(f){ document.getElementById('sim-video-pp').appendChild(makeSimCard(f)); });
+  artVideos.forEach(function(f){ document.getElementById('sim-video-art').appendChild(makeSimCard(f)); });
+
+  document.getElementById('sim-tabs').addEventListener('click', function(e){
+    if(e.target.tagName !== 'BUTTON') return;
+    this.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+    e.target.classList.add('active');
+    var tab = e.target.getAttribute('data-tab');
+    document.getElementById('carousel-sim-pp').style.display = tab === 'pp' ? '' : 'none';
+    document.getElementById('carousel-sim-art').style.display = tab === 'art' ? '' : 'none';
+  });
+
+  var rwI = {
+    id_sweep: 'Sweep the trash on the table into the dustpan using the broom, then pour it into the trash bin.',
+    id_handover_bread: 'Grab the long bread with the left hand, transfer to the right, and put on the empty shelf.',
+    id_handover_grape: 'Grab grapes with the left hand, transfer to the right, and put on the empty shelf.',
+    id_put_bowl: 'Put the bowl in the box.',
+    id_put_banana: 'Put the banana in the box.',
+    id_pour_pepsi: 'Pour contents from the bottle into the cup.',
+    id_pour_water: 'Pour contents from the bottle into the cup.',
+    ood_sweep: 'Sweep the trash on the table into the dustpan using the broom, then pour it into the trash bin.',
+    ood_handover_bread_bottom_shelf: 'Grab the long bread with the left hand, transfer to the right, and put on the empty shelf.',
+    ood_handover_grape_top_shelf: 'Grab grapes with the left hand, transfer to the right, and put on the empty shelf.',
+    ood_combination_put_bowl: 'Put the bowl in the box.',
+    ood_combination_put_banana: 'Put the banana in the box.',
+    ood_combination_put_bowl_single_side: 'Put the bowl in the box.',
+    ood_distractor_bowl: 'Put the bowl in the box.',
+    ood_distractor_banana: 'Put the banana in the box.',
+    ood_pour_tea: 'Pour contents from the bottle into the cup.',
+    ood_pour_mirinda: 'Pour contents from the bottle into the cup.',
+    ood_pour_water: 'Pour contents from the bottle into the cup.'
+  };
+
+  fill('rw-id-row', [
+    makeRealCard('id_pour_pepsi', rwI.id_pour_pepsi, 'Pouring'),
+    makeRealCard('id_pour_water', rwI.id_pour_water, 'Pouring'),
+    makeRealCard('id_put_bowl', rwI.id_put_bowl, 'Pick & Place'),
+    makeRealCard('id_put_banana', rwI.id_put_banana, 'Pick & Place')
+  ]);
+
+  fill('rw-ood-row', [
+    makeRealCard('ood_combination_put_bowl', rwI.ood_combination_put_bowl, 'Combinatorial Generalization'),
+    makeRealCard('ood_combination_put_banana', rwI.ood_combination_put_banana, 'Combinatorial Generalization'),
+    makeRealCard('ood_combination_put_bowl_single_side', rwI.ood_combination_put_bowl_single_side, 'Combinatorial Generalization'),
+    makeRealCard('ood_distractor_bowl', rwI.ood_distractor_bowl, 'Distractor Robustness'),
+    makeRealCard('ood_distractor_banana', rwI.ood_distractor_banana, 'Distractor Robustness'),
+    makeRealCard('ood_pour_tea', rwI.ood_pour_tea, 'Instance-Level Transfer'),
+    makeRealCard('ood_pour_mirinda', rwI.ood_pour_mirinda, 'Instance-Level Transfer'),
+    makeRealCard('ood_pour_water', rwI.ood_pour_water, 'Instance-Level Transfer')
+  ]);
+
+  fill('rw-multistage-id-row', [
+    makeRealCard('id_handover_bread', rwI.id_handover_bread, 'Handover'),
+    makeRealCard('id_handover_grape', rwI.id_handover_grape, 'Handover'),
+    makeRealCard('id_sweep', rwI.id_sweep, 'Sweeping')
+  ]);
+
+  fill('rw-multistage-ood-row', [
+    makeRealCard('ood_handover_bread_bottom_shelf', rwI.ood_handover_bread_bottom_shelf, 'Fixture-Level Transfer'),
+    makeRealCard('ood_handover_grape_top_shelf', rwI.ood_handover_grape_top_shelf, 'Fixture-Level Transfer'),
+    makeRealCard('ood_sweep', rwI.ood_sweep, 'Surface-Level Transfer')
+  ]);
+
+  document.getElementById('rw-multistage-tabs').addEventListener('click', function(e){
+    if(e.target.tagName !== 'BUTTON') return;
+    this.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+    e.target.classList.add('active');
+    var tab = e.target.getAttribute('data-tab');
+    document.getElementById('carousel-rw-multistage-id').style.display  = tab === 'id'  ? '' : 'none';
+    document.getElementById('carousel-rw-multistage-ood').style.display = tab === 'ood' ? '' : 'none';
+  });
+
+  function initCarousel(carouselEl){
+    var track = carouselEl.querySelector('.carousel-track');
+    var items = Array.prototype.slice.call(track.children);
+    var total = items.length;
+    if(total <= 3){
+      carouselEl.querySelectorAll('.carousel-btn').forEach(function(b){ b.style.display='none'; });
+      var cnt = carouselEl.querySelector('.carousel-counter');
+      if(cnt) cnt.style.display='none';
+      return;
+    }
+    var start = 0;
+
+    function show(){
+      items.forEach(function(c){ c.style.display='none'; c.style.order=''; });
+      for(var i = 0; i < 3; i++){
+        var idx = (start + i) % total;
+        items[idx].style.display = '';
+        items[idx].style.order = i;
+      }
+    }
+
+    carouselEl.addEventListener('click', function(e){
+      var btn = e.target.closest('.carousel-btn');
+      if(!btn) return;
+      var dir = parseInt(btn.getAttribute('data-dir'));
+      start = (start + dir + total) % total;
+      show();
+    });
+
+    show();
+  }
+
+  document.querySelectorAll('.carousel').forEach(initCarousel);
+
+  /* Hero demo videos */
+  fill('demo-basic-id-row', [
+    makeRealCard('id_pour_pepsi', rwI.id_pour_pepsi, 'Pouring'),
+    makeRealCard('id_pour_water', rwI.id_pour_water, 'Pouring'),
+    makeRealCard('id_put_bowl', rwI.id_put_bowl, 'Pick & Place'),
+    makeRealCard('id_put_banana', rwI.id_put_banana, 'Pick & Place')
+  ]);
+
+  fill('demo-basic-ood-row', [
+    makeRealCard('ood_combination_put_bowl', rwI.ood_combination_put_bowl, 'Combinatorial Generalization'),
+    makeRealCard('ood_combination_put_banana', rwI.ood_combination_put_banana, 'Combinatorial Generalization'),
+    makeRealCard('ood_combination_put_bowl_single_side', rwI.ood_combination_put_bowl_single_side, 'Combinatorial Generalization'),
+    makeRealCard('ood_distractor_bowl', rwI.ood_distractor_bowl, 'Distractor Robustness'),
+    makeRealCard('ood_distractor_banana', rwI.ood_distractor_banana, 'Distractor Robustness'),
+    makeRealCard('ood_pour_tea', rwI.ood_pour_tea, 'Instance-Level Transfer'),
+    makeRealCard('ood_pour_mirinda', rwI.ood_pour_mirinda, 'Instance-Level Transfer'),
+    makeRealCard('ood_pour_water', rwI.ood_pour_water, 'Instance-Level Transfer')
+  ]);
+
+  fill('demo-multistage-id-row', [
+    makeRealCard('id_handover_bread', rwI.id_handover_bread, 'Handover'),
+    makeRealCard('id_handover_grape', rwI.id_handover_grape, 'Handover'),
+    makeRealCard('id_sweep', rwI.id_sweep, 'Sweeping')
+  ]);
+
+  fill('demo-multistage-ood-row', [
+    makeRealCard('ood_handover_bread_bottom_shelf', rwI.ood_handover_bread_bottom_shelf, 'Fixture-Level Transfer'),
+    makeRealCard('ood_handover_grape_top_shelf', rwI.ood_handover_grape_top_shelf, 'Fixture-Level Transfer'),
+    makeRealCard('ood_sweep', rwI.ood_sweep, 'Surface-Level Transfer')
+  ]);
+
+  var heroDemoState = {task:'multistage', dist:'id'};
+  function updateHeroDemoVisibility(){
+    ['basic-id','basic-ood','multistage-id','multistage-ood'].forEach(function(key){
+      var el = document.getElementById('demo-carousel-' + key);
+      if(el) el.style.display = (key === heroDemoState.task + '-' + heroDemoState.dist) ? '' : 'none';
+    });
+  }
+
+  document.getElementById('demo-tabs-task').addEventListener('click', function(e){
+    if(e.target.tagName !== 'BUTTON') return;
+    this.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+    e.target.classList.add('active');
+    heroDemoState.task = e.target.getAttribute('data-task');
+    updateHeroDemoVisibility();
+  });
+
+  document.getElementById('demo-tabs-dist').addEventListener('click', function(e){
+    if(e.target.tagName !== 'BUTTON') return;
+    this.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+    e.target.classList.add('active');
+    heroDemoState.dist = e.target.getAttribute('data-dist');
+    updateHeroDemoVisibility();
+  });
+
+  ['basic-id','basic-ood','multistage-id','multistage-ood'].forEach(function(key){
+    var el = document.getElementById('demo-carousel-' + key);
+    if(el) initCarousel(el);
+  });
+
+  /* Lazy load videos */
+  var progressMap = new WeakMap();
+  var videoObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      var v = e.target;
+      var dataSrc = v.dataset.src;
+      if(!dataSrc) return;
+      if(e.isIntersecting){
+        if(!v.src || v.src === window.location.href){
+          var savedTime = progressMap.get(v) || 0;
+          v.src = dataSrc;
+          v.load();
+          v.addEventListener('loadedmetadata', function onMeta(){
+            v.removeEventListener('loadedmetadata', onMeta);
+            v.playbackRate = 2.0;
+            v.currentTime = savedTime;
+            v.play().catch(function(){});
+          });
+        } else {
+          v.playbackRate = 2.0;
+          v.play().catch(function(){});
+        }
+      } else {
+        if(v.src && v.src !== window.location.href){
+          progressMap.set(v, v.currentTime);
+          v.pause();
+          v.removeAttribute('src');
+          v.load();
+        }
+      }
+    });
+  }, {rootMargin:'100px 0px'});
+
+  function startLazyVideos(){
+    document.querySelectorAll('video[data-src]').forEach(function(v){
+      videoObs.observe(v);
+    });
+  }
+
+  var teaserV = document.getElementById('teaser-video');
+  var switched = false;
+
+  function switchToFull(){
+    if(switched) return;
+    switched = true;
+    teaserV.pause();
+    teaserV.src = 'videos/teaser_live_dark_with_long_horizon_faststart.mp4';
+    teaserV.loop = true;
+    teaserV.load();
+    teaserV.addEventListener('loadedmetadata', function onFull(){
+      teaserV.removeEventListener('loadedmetadata', onFull);
+      teaserV.playbackRate = 2.0;
+      teaserV.currentTime = 0;
+      teaserV.play().catch(function(){});
+    });
+  }
+
+  if(teaserV){
+    teaserV.playbackRate = 2.0;
+    teaserV.addEventListener('loadedmetadata', function(){ this.playbackRate = 2.0; });
+    teaserV.addEventListener('ended', switchToFull);
+    teaserV.addEventListener('canplay', function onCanPlay(){
+      teaserV.removeEventListener('canplay', onCanPlay);
+      startLazyVideos();
+    });
+    setTimeout(startLazyVideos, 3000);
+  }
+
+  var moVideo = document.getElementById('model-overview-video');
+  if(moVideo){
+    moVideo.playbackRate = 0.5;
+    moVideo.addEventListener('ended', function(){
+      var v = this;
+      setTimeout(function(){ v.currentTime = 0; v.play().catch(function(){}); }, 10000);
+    });
+  }
+
+  document.querySelectorAll('#sim-video-pp video, #sim-video-art video').forEach(function(v){
+    v.addEventListener('timeupdate', function(){
+      if(this.duration && this.currentTime >= this.duration * 0.75){
+        this.currentTime = 0;
+      }
+    });
+  });
+
+})();
+</script>
+</body>
+</html>
